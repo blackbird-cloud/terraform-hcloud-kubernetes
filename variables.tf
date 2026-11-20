@@ -503,19 +503,37 @@ variable "bare_metal_nodepools" {
       preserve_other_disks   = optional(bool, false)
       robot_firewall_enabled = optional(bool, true)
     }))
-    labels      = optional(map(string), {})
-    annotations = optional(map(string), {})
-    taints      = optional(list(string), [])
-    rdns        = optional(string)
-    rdns_ipv4   = optional(string)
-    rdns_ipv6   = optional(string)
+    labels                 = optional(map(string), {})
+    annotations            = optional(map(string), {})
+    taints                 = optional(list(string), [])
+    rdns                   = optional(string)
+    rdns_ipv4              = optional(string)
+    rdns_ipv6              = optional(string)
+    talos_image_extensions = optional(list(string), [])
+    config_patches         = optional(list(string), [])
   }))
   default     = []
-  description = "Defines configuration settings for Hetzner bare metal Worker node pools."
+  description = "Defines configuration settings for Hetzner bare metal Worker node pools. `talos_image_extensions` adds Talos image extensions to this pool's metal schematics on top of the global ones (e.g. GPU drivers). `config_patches` applies Talos configuration patches (YAML or JSON encoded, e.g. `yamlencode({...})`) to this pool's servers only, after the module's own bare metal patches and before `bare_metal_config_patches`."
 
   validation {
     condition     = length(var.bare_metal_nodepools) == length(distinct([for np in var.bare_metal_nodepools : np.name]))
     error_message = "Bare metal nodepool names must be unique to avoid configuration conflicts."
+  }
+
+  validation {
+    condition = alltrue([
+      for np in var.bare_metal_nodepools : length(np.talos_image_extensions) == length(distinct(np.talos_image_extensions))
+    ])
+    error_message = "Bare metal nodepool talos_image_extensions must not contain duplicates."
+  }
+
+  validation {
+    condition = alltrue([
+      for np in var.bare_metal_nodepools : alltrue([
+        for patch in np.config_patches : can(keys(yamldecode(patch)))
+      ])
+    ])
+    error_message = "Bare metal nodepool config_patches must be YAML or JSON encoded Talos configuration documents (one document per entry)."
   }
 
   validation {

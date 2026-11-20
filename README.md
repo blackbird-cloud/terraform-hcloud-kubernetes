@@ -295,6 +295,40 @@ kubectl -n kube-system rollout restart ds/cilium ds/cilium-envoy
 kubectl -n kube-system rollout restart deploy/cilium-operator
 ```
 
+#### Nodepool Extensions and Config Patches
+
+`talos_image_extensions` and `bare_metal_config_patches` apply to every bare metal server. To give one nodepool extra Talos image extensions or configuration (for example GPU drivers), set them on the nodepool:
+
+```hcl
+bare_metal_nodepools = [
+  {
+    name   = "gpu"
+    labels = { "nvidia.com/gpu.present" = "true" }
+    taints = ["nvidia.com/gpu=present:NoSchedule"]
+
+    # Added to this pool's metal schematics, on top of the global extensions
+    talos_image_extensions = [
+      "siderolabs/nvidia-open-gpu-kernel-modules-production",
+      "siderolabs/nvidia-container-toolkit-production"
+    ]
+
+    # Talos documents applied to this pool's servers only (YAML or JSON encoded)
+    config_patches = [
+      for module in ["nvidia", "nvidia_uvm", "nvidia_drm", "nvidia_modeset"] :
+      yamlencode({ apiVersion = "v1alpha1", kind = "KernelModuleConfig", name = module })
+    ]
+
+    servers = [
+      { number = 3333333, private_ipv4 = "10.0.88.4" }
+    ]
+  }
+]
+```
+
+Extension names must match exactly, for example `siderolabs/nvidia-container-toolkit-production`, not `nvidia-container-toolkit`. Nodepool patches are applied after the module's own bare metal patches and before `bare_metal_config_patches`. Nodepools without extra extensions keep the same schematic as before.
+
+A new server is installed with its nodepool's schematic. Changing `talos_image_extensions` on a nodepool with existing servers updates their schematic, but it does not trigger the Talos upgrade by itself. Roll it out with `tofu apply -replace=terraform_data.upgrade_bare_metal`. The upgrade skips every node that already runs the target Talos version and schematic.
+
 #### Robot Firewall
 
 By default the module manages the [Robot firewall](https://docs.hetzner.com/robot/dedicated-server/firewall/) of every bare metal server. Some servers have none, for example those with a 10G uplink, where the Robot API answers `404 FIREWALL_NOT_AVAILABLE` and the apply fails. Opt out per server with `robot_firewall_enabled = false`:

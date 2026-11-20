@@ -11,6 +11,9 @@ locals {
         install_raid_level     = server.install_raid_level,
         preserve_other_disks   = server.preserve_other_disks,
         robot_firewall_enabled = server.robot_firewall_enabled,
+        # Pool-level Talos customization (see var.bare_metal_nodepools)
+        nodepool_talos_image_extensions = np.talos_image_extensions,
+        nodepool_config_patches         = np.config_patches,
       }
     }
   ]...) : {}

@@ -147,7 +147,11 @@ locals {
         kind       = "HostnameConfig"
         hostname   = server.name
         auto       = "off"
-      }]
+      }],
+      # Nodepool-level patches (var.bare_metal_nodepools[*].config_patches),
+      # applied after the module's own patches and before
+      # var.bare_metal_config_patches.
+      [for patch in server.nodepool_config_patches : yamldecode(patch)]
     )
   }
 }
