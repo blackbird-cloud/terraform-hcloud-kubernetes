@@ -295,6 +295,31 @@ bare_metal_nodepools = [
 ]
 ```
 
+Extra Talos image extensions for one pool go to its `talos_image_extensions`, on top of the global `talos_image_extensions`. Together with `config_patches` this covers hardware only one pool has, for example GPUs:
+
+```hcl
+bare_metal_nodepools = [
+  {
+    name   = "gpu"
+    labels = { "nvidia.com/gpu.present" = "true" }
+    taints = ["nvidia.com/gpu=present:NoSchedule"]
+    servers = [
+      { number = 3333333, private_ipv4 = "10.0.88.4" }
+    ]
+    talos_image_extensions = [
+      "siderolabs/nvidia-open-gpu-kernel-modules-production",
+      "siderolabs/nvidia-container-toolkit-production"
+    ]
+    config_patches = [
+      for module in ["nvidia", "nvidia_uvm", "nvidia_drm", "nvidia_modeset"] :
+      yamlencode({ apiVersion = "v1alpha1", kind = "KernelModuleConfig", name = module })
+    ]
+  }
+]
+```
+
+Extension names must match exactly, for example `siderolabs/nvidia-container-toolkit-production`, not `nvidia-container-toolkit`. Pools without extra extensions keep their schematic unchanged. New servers are installed with their pool's schematic. Changing a pool's `talos_image_extensions` updates the schematic of its existing servers but does not start an upgrade by itself; roll it out with `tofu apply -replace=terraform_data.upgrade_bare_metal`, which skips every node already on the target Talos version and schematic.
+
 #### vSwitch Network
 
 The module creates the vSwitch and connects it to the Hetzner Cloud Network. To use an existing vSwitch instead, set:
